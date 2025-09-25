@@ -248,15 +248,15 @@
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <div class="loading-text">Scraping data and generating PDF...</div>
+            <div class="loading-text">Scraping data and generating report...</div>
         </div>
         
         <div class="error" id="error"></div>
         
         <div class="result" id="result">
             <h3>Data scraped successfully!</h3>
-            <p>Your PDF report is ready for download.</p>
-            <button class="download-btn" onclick="downloadReport()">Download PDF</button>
+            <p>Your report is ready for download.</p>
+            <button class="download-btn" onclick="downloadReport()">Download Report</button>
         </div>
     </div>
 
@@ -323,7 +323,7 @@
                 const url = window.URL.createObjectURL(reportBlob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `scraped-data-${Date.now()}.pdf`;
+                a.download = `scraped-data-${Date.now()}.html`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
