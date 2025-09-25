@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 
@@ -71,13 +72,80 @@ app.post('/api/scrape', async (req, res) => {
             })).get()
         };
 
-        // Generate simple HTML report
+        // Generate HTML report for PDF conversion
         const htmlReport = generateHTMLReport(scrapedData);
         
-        // For now, return the HTML report as a downloadable file
-        res.setHeader('Content-Type', 'text/html');
-        res.setHeader('Content-Disposition', `attachment; filename="scraped-data-${Date.now()}.html"`);
-        res.send(htmlReport);
+        // Create PDF using Puppeteer with better error handling
+        let browser;
+        try {
+            browser = await puppeteer.launch({
+                headless: true,
+                args: [
+                    '--no-sandbox', 
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+            });
+            
+            const page = await browser.newPage();
+            
+            // Set a longer timeout
+            await page.setDefaultTimeout(30000);
+            
+            await page.setContent(htmlReport, { 
+                waitUntil: 'domcontentloaded',
+                timeout: 30000
+            });
+            
+            // Wait a bit for content to render
+            await page.waitForTimeout(2000);
+            
+            const pdfBuffer = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                margin: {
+                    top: '20mm',
+                    right: '20mm',
+                    bottom: '20mm',
+                    left: '20mm'
+                },
+                timeout: 30000
+            });
+            
+            await browser.close();
+
+            // Set response headers for PDF download
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="scraped-data-${Date.now()}.pdf"`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            
+            res.send(pdfBuffer);
+            
+        } catch (browserError) {
+            console.error('PDF generation error:', browserError);
+            
+            // Clean up browser if it exists
+            if (browser) {
+                try {
+                    await browser.close();
+                } catch (closeError) {
+                    console.error('Error closing browser:', closeError);
+                }
+            }
+            
+            // Fallback: return HTML report instead
+            console.log('Falling back to HTML report due to PDF generation error');
+            res.setHeader('Content-Type', 'text/html');
+            res.setHeader('Content-Disposition', `attachment; filename="scraped-data-${Date.now()}.html"`);
+            res.send(htmlReport);
+        }
 
     } catch (error) {
         console.error('Scraping error:', error);
